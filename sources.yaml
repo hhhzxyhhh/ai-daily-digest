@@ -1,0 +1,59 @@
+rss:
+  - name: "arXiv cs.AI"
+    url: "https://export.arxiv.org/rss/cs.AI"
+  - name: "arXiv cs.LG"
+    url: "https://export.arxiv.org/rss/cs.LG"
+  - name: "MIT Tech Review AI"
+    url: "https://www.technologyreview.com/topic/artificial-intelligence/feed/"
+  - name: "VentureBeat AI"
+    url: "https://venturebeat.com/category/ai/feed/"
+  - name: "Hacker News"
+    url: "https://hnrss.org/frontpage"
+
+newsapi:
+  query: "AI OR LLM OR machine learning OR deep learning"
+  language: "en"
+  page_size: 20
+
+github:
+  trending:
+    since: "daily"
+  keywords:
+    - "ai"
+    - "llm"
+    - "machine learning"
+    - "deep learning"
+    - "transformer"
+    - "diffusion"
+    - "agent"
+  watch_repos:
+    - "langchain-ai/langchain"
+    - "vllm-project/vllm"
+    - "openai/whisper"
+    - "huggingface/transformers"
+    - "ggml-org/llama.cpp"
+    - "open-webui/open-webui"
+  search:
+    created_days: 14
+    stars_min: 50
+
+websites:
+  - name: "机器之心"
+    url: "https://www.jiqizhixin.com/"
+    selector: "a.article-title"
+    base_url: "https://www.jiqizhixin.com"
+  - name: "量子位"
+    url: "https://www.qbitai.com/"
+    selector: "a.j-lazy"
+    base_url: "https://www.qbitai.com"
+
+reddit:
+  subreddits:
+    - "MachineLearning"
+    - "artificial"
+    - "LocalLLaMA"
+  limit: 20
+
+twitter:
+  query: "AI OR LLM OR machine learning lang:en"
+  max_results: 20

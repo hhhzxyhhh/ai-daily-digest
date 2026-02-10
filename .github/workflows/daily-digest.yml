@@ -1,0 +1,64 @@
+name: AI Daily Digest
+
+on:
+  # 每日定时触发 (UTC 时间 02:00 = 北京时间 10:00)
+  schedule:
+    - cron: '0 2 * * *'
+  
+  # 支持手动触发
+  workflow_dispatch:
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run AI Daily Digest
+        env:
+          # LLM 配置
+          LLM_STRATEGY: ${{ secrets.LLM_STRATEGY }}
+          LLM_PRIMARY_PROVIDER: ${{ secrets.LLM_PRIMARY_PROVIDER }}
+          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
+          QWEN_MODEL: ${{ secrets.QWEN_MODEL }}
+          QWEN_BASE_URL: ${{ secrets.QWEN_BASE_URL }}
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          ZHIPU_MODEL: ${{ secrets.ZHIPU_MODEL }}
+          ZHIPU_BASE_URL: ${{ secrets.ZHIPU_BASE_URL }}
+          
+          # 邮件配置
+          EMAIL_SMTP_HOST: ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+          
+          # 可选 API Keys
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+        run: |
+          python main.py --run-once
+      
+      - name: Upload archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-digest-archive
+          path: archive/
+          retention-days: 30
