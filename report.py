@@ -73,11 +73,6 @@ REPORT_HTML_TEMPLATE = Template(
       </ul>
     {% endfor %}
 
-    <h3>统计</h3>
-    <ul>
-      <li>今日采集 {{ total }} 条</li>
-      <li>筛选输出 {{ selected }} 条</li>
-    </ul>
   </body>
 </html>
 """
