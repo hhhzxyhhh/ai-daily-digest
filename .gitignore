@@ -35,6 +35,7 @@ pip-delete-this-directory.txt
 # IDES
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 

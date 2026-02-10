@@ -20,7 +20,16 @@ from config import load_settings
 from delivery import send_email
 from llm import LLMRouter
 from models import NewsItem
-from processing import classify, deduplicate, deduplicate_fuzzy, score, select_diverse_items
+from processing import (
+    classify,
+    classify_with_llm,
+    deduplicate,
+    deduplicate_fuzzy,
+    filter_ai_relevance_llm,
+    filter_relevance_keyword,
+    score,
+    select_diverse_items,
+)
 from report import build_report
 from collections import Counter
 
@@ -73,16 +82,35 @@ def run_once() -> None:
             except Exception as e:
                 logging.error(f"{collector.__class__.__name__} failed: {e}")
 
+    # 去重处理
     items = deduplicate(items)
-    items = deduplicate_fuzzy(items, threshold=0.75)  # 模糊去重
-    for item in items:
-        item.category = classify(item)
-        item.score = score(item)
-
+    items = deduplicate_fuzzy(items, threshold=0.75)
+    logging.info(f"Total items after dedup: {len(items)}")
+    
     # 统计各数据源贡献
     source_stats = Counter(item.source_type for item in items)
-    logging.info(f"Total items after dedup: {len(items)}")
     logging.info(f"Source distribution: {dict(source_stats)}")
+    
+    # ========== 三层过滤机制 ==========
+    # 第一层：关键词预过滤（黑名单+白名单）
+    whitelist_items, greyzone_items, blacklist_items = filter_relevance_keyword(items)
+    logging.info(f"Filter Layer 1 - Keyword: whitelist={len(whitelist_items)}, greyzone={len(greyzone_items)}, blacklist={len(blacklist_items)}")
+    
+    # 第二层：LLM精准判断（仅对灰色地带）
+    llm_approved_items = filter_ai_relevance_llm(greyzone_items, router)
+    logging.info(f"Filter Layer 2 - LLM relevance: {len(llm_approved_items)} approved out of {len(greyzone_items)} greyzone items")
+    
+    # 合并通过的新闻
+    items = whitelist_items + llm_approved_items
+    logging.info(f"Total items after relevance filtering: {len(items)}")
+    
+    # 第三层：LLM智能分类
+    classify_with_llm(items, router)
+    logging.info(f"Filter Layer 3 - LLM classification completed")
+    
+    # 评分
+    for item in items:
+        item.score = score(item)
 
     items.sort(key=lambda x: x.score, reverse=True)
     # 使用多样性选择器,确保来源均衡

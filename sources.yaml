@@ -11,7 +11,8 @@ rss:
     url: "https://hnrss.org/frontpage"
 
 newsapi:
-  query: "AI OR LLM OR machine learning OR deep learning"
+  # 优化查询：使用更精准的AI术语，排除常见非AI领域
+  query: "(\"artificial intelligence\" OR \"machine learning\" OR \"deep learning\" OR LLM OR GPT OR \"neural network\") -sports -entertainment -politics -celebrity -movie"
   language: "en"
   page_size: 20
 

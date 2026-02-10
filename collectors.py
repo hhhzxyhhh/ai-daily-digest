@@ -53,6 +53,15 @@ class RSSCollector(BaseCollector):
             "Hacker News": 0.55,
         }
 
+        # AI关键词列表（用于Hacker News过滤）
+        ai_keywords = [
+            "ai", "artificial intelligence", "machine learning", "deep learning",
+            "llm", "gpt", "neural network", "transformer", "diffusion",
+            "openai", "anthropic", "chatgpt", "claude", "gemini",
+            "pytorch", "tensorflow", "hugging face", "langchain",
+            "computer vision", "nlp", "natural language", "reinforcement learning",
+        ]
+        
         items: list[NewsItem] = []
         for src in sources:
             try:
@@ -63,12 +72,19 @@ class RSSCollector(BaseCollector):
                             entry.get("published") or entry.get("updated")
                         )
                         content = entry.get("summary", "") or entry.get("description", "")
+                        title = entry.get("title", "").strip()
+                        
+                        # 对Hacker News进行关键词过滤
+                        if src["name"] == "Hacker News":
+                            combined_text = f"{title} {content}".lower()
+                            if not any(keyword in combined_text for keyword in ai_keywords):
+                                continue  # 跳过不包含AI关键词的新闻
                         
                         # 根据来源权威度设置 raw_score
                         raw_score = source_authority.get(src["name"], 0.5)
                         
                         item = NewsItem(
-                            title=entry.get("title", "").strip(),
+                            title=title,
                             url=entry.get("link", "").strip(),
                             source=src["name"],
                             source_type=self.source_type,

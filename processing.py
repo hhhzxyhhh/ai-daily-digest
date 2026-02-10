@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from models import NewsItem
+
+if TYPE_CHECKING:
+    from llm import LLMRouter
+
+logger = logging.getLogger(__name__)
 
 
 def deduplicate(items: Iterable[NewsItem]) -> list[NewsItem]:
@@ -43,6 +50,201 @@ def deduplicate_fuzzy(items: list[NewsItem], threshold: float = 0.75) -> list[Ne
         if not is_dup:
             unique.append(item)
     return unique
+
+
+def filter_relevance_keyword(items: list[NewsItem]) -> tuple[list[NewsItem], list[NewsItem], list[NewsItem]]:
+    """
+    第一层：关键词预过滤（黑名单+白名单）
+    返回: (白名单通过, 灰色地带, 黑名单过滤)
+    """
+    # 黑名单：明显不相关的关键词（体育、娱乐、政治等）
+    BLACKLIST = [
+        # 体育
+        "superbowl", "super bowl", "nfl", "nba", "nhl", "mlb", "fifa", "world cup",
+        "football", "soccer", "basketball", "baseball", "hockey", "olympics",
+        "playoff", "championship", "tournament", "athlete", "coach", "player stats",
+        # 娱乐
+        "celebrity", "movie", "film", "actor", "actress", "oscar", "grammy",
+        "music album", "concert", "box office", "hollywood", "netflix show",
+        # 政治（除非与AI政策相关）
+        "election results", "president elect", "senate vote", "congress bill",
+        "political campaign", "democrat", "republican",
+        # 其他
+        "weather", "traffic", "crime", "accident", "obituary",
+        "real estate", "stock market crash", "cryptocurrency price",
+    ]
+    
+    # 白名单：明确与AI相关的关键词
+    WHITELIST = [
+        # 核心AI术语
+        "artificial intelligence", "machine learning", "deep learning", "neural network",
+        "llm", "large language model", "gpt", "transformer", "diffusion model",
+        "generative ai", "genai", "foundation model", "multimodal",
+        # 中文AI术语
+        "人工智能", "机器学习", "深度学习", "神经网络", "大模型", "生成式",
+        # 学术来源
+        "arxiv", "neurips", "icml", "iclr", "cvpr", "acl", "emnlp",
+        # 知名AI项目/公司
+        "openai", "anthropic", "deepmind", "hugging face", "langchain",
+        "pytorch", "tensorflow", "stable diffusion", "midjourney",
+        # AI应用领域
+        "computer vision", "natural language processing", "nlp", "speech recognition",
+        "reinforcement learning", "autonomous", "chatbot", "ai agent",
+    ]
+    
+    whitelist_pass: list[NewsItem] = []
+    greyzone: list[NewsItem] = []
+    blacklist_filtered: list[NewsItem] = []
+    
+    for item in items:
+        text = f"{item.title} {item.content}".lower()
+        
+        # 检查黑名单
+        if any(keyword in text for keyword in BLACKLIST):
+            blacklist_filtered.append(item)
+            continue
+        
+        # 检查白名单
+        if any(keyword in text for keyword in WHITELIST):
+            whitelist_pass.append(item)
+        else:
+            # 灰色地带：既不在黑名单也不在白名单
+            greyzone.append(item)
+    
+    logger.info(f"Keyword filter: {len(whitelist_pass)} whitelist, {len(greyzone)} greyzone, {len(blacklist_filtered)} blacklist")
+    return whitelist_pass, greyzone, blacklist_filtered
+
+
+def filter_ai_relevance_llm(items: list[NewsItem], router: "LLMRouter") -> list[NewsItem]:
+    """
+    第二层：LLM精准判断（仅用于灰色地带）
+    批量处理以减少API调用
+    """
+    if not items:
+        return []
+    
+    # 批量处理，每批10条
+    batch_size = 10
+    relevant_items: list[NewsItem] = []
+    
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i+batch_size]
+        
+        # 构建批量判断的prompt
+        news_list = "\n".join([
+            f"{idx}. 标题: {item.title}\n   内容: {item.content[:200]}"
+            for idx, item in enumerate(batch)
+        ])
+        
+        prompt = f"""判断以下新闻是否与人工智能/机器学习/深度学习/大语言模型相关。
+
+评判标准：
+- 相关：新闻主题是AI技术、AI应用、AI研究、AI产品、AI行业动态
+- 不相关：只是偶然提到AI，但主题是其他领域（如体育、娱乐、传统科技等）
+
+请只返回JSON数组，格式: [{{"index": 0, "relevant": true}}, {{"index": 1, "relevant": false}}, ...]
+
+新闻列表:
+{news_list}
+
+只返回JSON数组，不要其他内容。"""
+        
+        try:
+            response = router.complete(prompt)
+            # 尝试解析JSON响应
+            # 清理可能的markdown代码块标记
+            response = response.strip()
+            if response.startswith("```json"):
+                response = response[7:]
+            if response.startswith("```"):
+                response = response[3:]
+            if response.endswith("```"):
+                response = response[:-3]
+            response = response.strip()
+            
+            results = json.loads(response)
+            
+            for result in results:
+                idx = result.get("index", -1)
+                is_relevant = result.get("relevant", False)
+                if 0 <= idx < len(batch) and is_relevant:
+                    relevant_items.append(batch[idx])
+            
+            logger.info(f"LLM relevance filter: batch {i//batch_size + 1}, {len([r for r in results if r.get('relevant')])} relevant out of {len(batch)}")
+        
+        except Exception as e:
+            logger.warning(f"LLM relevance filter failed for batch {i//batch_size + 1}: {e}")
+            # 失败时保守处理：保留所有
+            relevant_items.extend(batch)
+    
+    return relevant_items
+
+
+def classify_with_llm(items: list[NewsItem], router: "LLMRouter") -> None:
+    """
+    第三层：LLM智能分类
+    批量处理并直接修改items的category属性
+    """
+    if not items:
+        return
+    
+    # 批量处理，每批8条
+    batch_size = 8
+    
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i+batch_size]
+        
+        # 构建批量分类的prompt
+        news_list = "\n".join([
+            f"{idx}. 标题: {item.title}\n   内容: {item.content[:300]}"
+            for idx, item in enumerate(batch)
+        ])
+        
+        prompt = f"""对以下AI新闻进行分类。
+
+类别定义：
+- 论文与研究：学术论文、研究成果、技术突破
+- 产品与发布：产品发布、版本更新、新功能上线
+- 行业动态：融资、并购、政策法规、市场分析
+- 教程与观点：技术教程、博客文章、观点分析、最佳实践
+- 开源项目：GitHub项目、开源工具、代码库
+- 应用案例：实际应用、案例研究、落地场景
+
+请只返回JSON数组，格式: [{{"index": 0, "category": "论文与研究"}}, {{"index": 1, "category": "产品与发布"}}, ...]
+
+新闻列表:
+{news_list}
+
+只返回JSON数组，不要其他内容。"""
+        
+        try:
+            response = router.complete(prompt)
+            # 清理可能的markdown代码块标记
+            response = response.strip()
+            if response.startswith("```json"):
+                response = response[7:]
+            if response.startswith("```"):
+                response = response[3:]
+            if response.endswith("```"):
+                response = response[:-3]
+            response = response.strip()
+            
+            results = json.loads(response)
+            
+            for result in results:
+                idx = result.get("index", -1)
+                category = result.get("category", "其他")
+                if 0 <= idx < len(batch):
+                    batch[idx].category = category
+            
+            logger.info(f"LLM classification: batch {i//batch_size + 1} completed")
+        
+        except Exception as e:
+            logger.warning(f"LLM classification failed for batch {i//batch_size + 1}: {e}")
+            # 失败时回退到关键词分类
+            for item in batch:
+                if not item.category:
+                    item.category = classify(item)
 
 
 def classify(item: NewsItem) -> str:
