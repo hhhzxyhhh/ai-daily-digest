@@ -83,7 +83,8 @@ def run_once() -> None:
     # 去重处理
     items = deduplicate(items)
     items = deduplicate_fuzzy(items, threshold=0.75)
-    logging.info(f"Total items after dedup: {len(items)}")
+    total_collected = len(items)  # 记录去重后的总数，用于统计
+    logging.info(f"Total items after dedup: {total_collected}")
 
     # 统计各数据源贡献
     source_stats = Counter(item.source_type for item in items)
@@ -133,7 +134,7 @@ def run_once() -> None:
 
     summaries = "\n".join([f"- {i.title}: {i.summary}" for i in items[:10]])
     overview = router.complete(OVERVIEW_PROMPT.format(summaries=summaries))
-    report_text, report_html = build_report(items, overview)
+    report_text, report_html = build_report(items, overview, total_collected)
 
     recipients = [e.strip() for e in settings.email_recipients.split(",") if e.strip()]
     subject = f"AI 日报 - {datetime.now().strftime('%Y-%m-%d')}"
