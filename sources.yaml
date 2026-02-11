@@ -9,6 +9,8 @@ rss:
     url: "https://venturebeat.com/category/ai/feed/"
   - name: "Hacker News"
     url: "https://hnrss.org/frontpage"
+  - name: "机器之心"
+    url: "https://www.jiqizhixin.com/rss"
 
 newsapi:
   # 优化查询：使用更精准的AI术语，排除常见非AI领域
@@ -36,16 +38,12 @@ github:
     - "open-webui/open-webui"
   search:
     created_days: 14
-    stars_min: 50
+    stars_min: 1000
 
 websites:
-  - name: "机器之心"
-    url: "https://www.jiqizhixin.com/"
-    selector: "a.article-title"
-    base_url: "https://www.jiqizhixin.com"
   - name: "量子位"
     url: "https://www.qbitai.com/"
-    selector: "a.j-lazy"
+    selector: "h4 a"
     base_url: "https://www.qbitai.com"
 
 reddit:
@@ -53,6 +51,12 @@ reddit:
     - "MachineLearning"
     - "artificial"
     - "LocalLLaMA"
+    - "AItools"
+    - "ArtificialIntelligence"
+    - "AIProduct"
+    - "computervision"
+    - "NLP"
+    - "reinforcementlearning"
   limit: 20
 
 twitter:

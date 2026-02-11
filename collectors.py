@@ -51,12 +51,13 @@ class RSSCollector(BaseCollector):
             "MIT Tech Review AI": 0.65,
             "VentureBeat AI": 0.6,
             "Hacker News": 0.55,
+            "机器之心": 0.65,  # 国内AI领域权威媒体
         }
 
         # AI关键词列表（用于Hacker News过滤）
         ai_keywords = [
             "ai", "artificial intelligence", "machine learning", "deep learning",
-            "llm", "gpt", "neural network", "transformer", "diffusion",
+            "llm", "gpt", "neural network", "transformer", "diffusion", "agent",
             "openai", "anthropic", "chatgpt", "claude", "gemini",
             "pytorch", "tensorflow", "hugging face", "langchain",
             "computer vision", "nlp", "natural language", "reinforcement learning",
@@ -194,7 +195,7 @@ class GitHubCollector(BaseCollector):
 
     def _collect_search(self, cfg: dict) -> list[NewsItem]:
         created_days = int(cfg.get("search", {}).get("created_days", 14))
-        stars_min = int(cfg.get("search", {}).get("stars_min", 50))
+        stars_min = int(cfg.get("search", {}).get("stars_min", 1000))
         created_after = (datetime.now(timezone.utc) - timedelta(days=created_days)).date()
         query = f"topic:ai created:>{created_after} stars:>={stars_min}"
 
@@ -296,6 +297,9 @@ class WebScraperCollector(BaseCollector):
 
     def __init__(self, sources_path: str) -> None:
         self.sources_path = sources_path
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
 
     def collect(self) -> list[NewsItem]:
         with open(self.sources_path, "r", encoding="utf-8") as f:
@@ -303,31 +307,98 @@ class WebScraperCollector(BaseCollector):
 
         items: list[NewsItem] = []
         for site in sites:
-            url = site.get("url")
-            selector = site.get("selector")
-            if not url or not selector:
-                continue
-            resp = httpx.get(url, timeout=20)
+            items.extend(self._collect_from_html(site))
+        
+        return items
+    
+    def _extract_publish_time(self, url: str, soup: BeautifulSoup | None) -> datetime:
+        """提取文章发布时间"""
+        # 方法1：从详情页的 <time> 标签提取
+        if soup:
+            time_tag = soup.find("time")
+            if time_tag:
+                # 尝试从 datetime 属性提取
+                dt_str = time_tag.get("datetime")
+                if dt_str:
+                    try:
+                        return date_parser.parse(dt_str)
+                    except Exception:
+                        pass
+        
+        # 方法2：从 URL 中提取日期（如 /2026/02/378423.html）
+        date_pattern = r'/(\d{4})/(\d{2})/(\d{2})'
+        match = re.search(date_pattern, url)
+        if match:
+            try:
+                year, month, day = match.groups()
+                return datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
+            except Exception:
+                pass
+        
+        # 回退：使用当前时间
+        return datetime.now(timezone.utc)
+    
+    def _collect_from_html(self, site: dict) -> list[NewsItem]:
+        """从 HTML 页面爬取文章列表"""
+        url = site.get("url")
+        selector = site.get("selector")
+        site_name = site.get("name", "Unknown")
+        
+        if not url or not selector:
+            logger.warning(f"Site {site_name} missing url or selector")
+            return []
+        
+        items: list[NewsItem] = []
+        try:
+            resp = httpx.get(url, headers=self.headers, timeout=20)
             if resp.status_code != 200:
-                continue
+                logger.warning(f"Failed to fetch {site_name} ({url}): status {resp.status_code}")
+                return []
+            
             soup = BeautifulSoup(resp.text, "html.parser")
-            for link in soup.select(selector)[:20]:
+            links = soup.select(selector)
+            
+            if not links:
+                logger.warning(f"No links found for {site_name} with selector '{selector}'")
+                return []
+            
+            logger.info(f"Found {len(links)} links for {site_name}")
+            
+            for link in links[:20]:
                 href = link.get("href") or ""
                 title = link.get_text(strip=True)
                 if href.startswith("/"):
                     href = site.get("base_url", url).rstrip("/") + href
-                if not href:
+                if not href or not title:
                     continue
                 
                 # 尝试二次抓取正文内容
                 content = ""
                 try:
-                    detail_resp = httpx.get(href, timeout=10)
+                    detail_resp = httpx.get(href, headers=self.headers, timeout=10)
                     if detail_resp.status_code == 200:
                         detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
-                        # 提取前5段落作为摘要
+                        
+                        # 提取段落并过滤样板文本
                         paragraphs = detail_soup.select("p")
-                        content = " ".join(p.get_text(strip=True) for p in paragraphs[:5])
+                        filtered_paragraphs = []
+                        
+                        # 样板关键词（用于过滤）
+                        boilerplate_keywords = ["扫码", "关注", "二维码", "订阅", "点击", "转发", "分享"]
+                        
+                        for p in paragraphs:
+                            text = p.get_text(strip=True)
+                            # 过滤：长度太短（<20字符）或包含样板关键词
+                            if len(text) < 20:
+                                continue
+                            if any(keyword in text for keyword in boilerplate_keywords):
+                                continue
+                            filtered_paragraphs.append(text)
+                            # 最多取5段
+                            if len(filtered_paragraphs) >= 5:
+                                break
+                        
+                        content = " ".join(filtered_paragraphs)
                         # 限制长度
                         if len(content) > 500:
                             content = content[:500] + "..."
@@ -335,17 +406,23 @@ class WebScraperCollector(BaseCollector):
                     logger.debug(f"Failed to fetch content from {href}: {e}")
                     content = ""
                 
+                # 提取发布时间
+                published_at = self._extract_publish_time(href, detail_soup if 'detail_soup' in locals() else None)
+                
                 item = NewsItem(
                     title=title,
                     url=href,
                     source=site.get("name", "Web"),
                     source_type=self.source_type,
                     content=content,
-                    published_at=datetime.now(timezone.utc),
-                    raw_score=0.5,
+                    published_at=published_at,
+                    raw_score=0.65,
                 )
                 item.fingerprint = self._fingerprint(item)
                 items.append(item)
+        except Exception as e:
+            logger.error(f"Failed to collect from {site_name}: {e}")
+        
         return items
 
 

@@ -80,8 +80,12 @@ def filter_relevance_keyword(items: list[NewsItem]) -> tuple[list[NewsItem], lis
         "artificial intelligence", "machine learning", "deep learning", "neural network",
         "llm", "large language model", "gpt", "transformer", "diffusion model",
         "generative ai", "genai", "foundation model", "multimodal",
-        # 中文AI术语
+        # 中文AI术语（扩充）
         "人工智能", "机器学习", "深度学习", "神经网络", "大模型", "生成式",
+        "大语言模型", "智能体", "多模态", "具身智能", "扩散模型", "开源模型",
+        "算力", "推理", "训练", "微调", "预训练", "提示词", "提示工程",
+        "向量数据库", "检索增强", "知识图谱", "强化学习", "迁移学习",
+        "自然语言处理", "计算机视觉", "语音识别", "图像生成", "文本生成",
         # 学术来源
         "arxiv", "neurips", "icml", "iclr", "cvpr", "acl", "emnlp",
         # 知名AI项目/公司
@@ -314,18 +318,21 @@ def score(item: NewsItem) -> float:
 
 def select_diverse_items(items: list[NewsItem], max_count: int = 10) -> list[NewsItem]:
     """
-    双维度多样性选择器: 
+    三维度多样性选择器: 
     - 确保每个来源类型最多占 40% 配额
+    - 确保每个具体来源最多占 3 条（防止单一来源霸榜）
     - 确保每个内容类别最多占 35% 配额
     避免单一来源或单一类别主导结果
     """
     # 按评分排序
     sorted_items = sorted(items, key=lambda x: x.score, reverse=True)
     
-    # 每个来源类型和类别的最大配额
-    max_per_source = max(2, int(max_count * 0.4))
+    # 每个来源类型、具体来源和类别的最大配额
+    max_per_source_type = max(2, int(max_count * 0.4))
+    max_per_source = 3  # 每个具体来源最多3条
     max_per_category = max(2, int(max_count * 0.35))
     
+    source_type_counts: dict[str, int] = defaultdict(int)
     source_counts: dict[str, int] = defaultdict(int)
     category_counts: dict[str, int] = defaultdict(int)
     selected: list[NewsItem] = []
@@ -334,12 +341,14 @@ def select_diverse_items(items: list[NewsItem], max_count: int = 10) -> list[New
         if len(selected) >= max_count:
             break
         
-        source_ok = source_counts[item.source_type] < max_per_source
+        source_type_ok = source_type_counts[item.source_type] < max_per_source_type
+        source_ok = source_counts[item.source] < max_per_source
         category_ok = category_counts[item.category or "其他"] < max_per_category
         
-        if source_ok and category_ok:
+        if source_type_ok and source_ok and category_ok:
             selected.append(item)
-            source_counts[item.source_type] += 1
+            source_type_counts[item.source_type] += 1
+            source_counts[item.source] += 1
             category_counts[item.category or "其他"] += 1
     
     # 如果因限制太严导致不够，放宽限制再补充
