@@ -80,8 +80,9 @@ REPORT_HTML_TEMPLATE = Template(
 def build_report(items: list[NewsItem], overview: str) -> tuple[str, str]:
     date = datetime.now().strftime("%Y-%m-%d")
     top_items = items[:5]
+    rest_items = items[5:]
     grouped: dict[str, list[NewsItem]] = defaultdict(list)
-    for item in items:
+    for item in rest_items:
         grouped[item.category or "其他"].append(item)
     text = REPORT_TEXT_TEMPLATE.render(
         date=date,
