@@ -194,7 +194,9 @@ class TestSelectDiverseItems:
 
         # 添加8个RSS项目，评分交错分布
         for i in range(8):
-            item = create_test_item(source_type="rss", raw_score=0.88 - i * 0.02, url=f"https://rss.com/{i}")
+            item = create_test_item(
+                source_type="rss", raw_score=0.88 - i * 0.02, url=f"https://rss.com/{i}"
+            )
             item.source = f"RSS_{i}"  # 设置不同的source
             item.score = item.raw_score
             items.append(item)
