@@ -205,7 +205,7 @@ class TestSelectDiverseItems:
         # 有足够多样性时，应该从两种类型中各选一些
         github_count = sum(1 for item in result if item.source_type == "github")
         rss_count = sum(1 for item in result if item.source_type == "rss")
-        
+
         # 验证多样性：两种类型都应该被选中
         assert github_count > 0, "应该选择一些github项目"
         assert rss_count > 0, "应该选择一些rss项目"
@@ -476,7 +476,7 @@ class TestDualDiversitySelection:
         # 有足够多样性时，应该有多个不同的source_type和category
         assert len(source_type_counts) >= 2, "应该有至少2种不同的来源类型"
         assert len(category_counts) >= 2, "应该有至少2种不同的类别"
-        
+
         # 每个source_type和category不应该过度主导
         for st, count in source_type_counts.items():
             assert count <= 5, f"来源类型 {st} 有 {count} 个项目，过度主导"
