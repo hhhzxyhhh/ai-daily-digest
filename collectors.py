@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
+import os
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -318,8 +319,19 @@ class WebScraperCollector(BaseCollector):
 
     def __init__(self, sources_path: str) -> None:
         self.sources_path = sources_path
+        # 增强请求头，更好地模拟真实浏览器
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://www.google.com/",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Cache-Control": "max-age=0",
         }
 
     def collect(self) -> list[NewsItem]:
@@ -371,7 +383,20 @@ class WebScraperCollector(BaseCollector):
 
         items: list[NewsItem] = []
         try:
-            resp = httpx.get(url, headers=self.headers, timeout=20)
+            resp = httpx.get(url, headers=self.headers, timeout=20, follow_redirects=True)
+            if resp.status_code == 403:
+                # 403 通常是反爬虫机制，在 CI 环境中很常见
+                is_ci = os.getenv("CI", "").lower() in ("true", "1", "yes")
+                if is_ci:
+                    logger.warning(
+                        f"Site {site_name} returned 403 (likely anti-bot). "
+                        f"This is expected in CI environments. Skipping."
+                    )
+                else:
+                    logger.warning(
+                        f"Site {site_name} returned 403. Consider using a proxy or different headers."
+                    )
+                return []
             if resp.status_code != 200:
                 logger.warning(f"Failed to fetch {site_name} ({url}): status {resp.status_code}")
                 return []
@@ -464,6 +489,15 @@ class RedditCollector(BaseCollector):
         self.sources_path = sources_path
 
     def collect(self) -> list[NewsItem]:
+        # 检测 CI 环境：Reddit 会封禁 GitHub Actions 等 CI 环境的 IP
+        is_ci = os.getenv("CI", "").lower() in ("true", "1", "yes")
+        if is_ci:
+            logger.warning(
+                "Reddit collection is disabled in CI environments due to IP blocking. "
+                "Reddit API requires OAuth authentication for automated access from cloud IPs."
+            )
+            return []
+
         with open(self.sources_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f).get("reddit", {})
         subs = cfg.get("subreddits", ["MachineLearning", "artificial", "LocalLLaMA"])
@@ -472,8 +506,18 @@ class RedditCollector(BaseCollector):
         items: list[NewsItem] = []
         for sub in subs:
             url = f"https://www.reddit.com/r/{sub}/hot.json?limit={limit}"
-            resp = httpx.get(url, headers={"User-Agent": "ai-digest-bot/1.0"}, timeout=20)
-            if resp.status_code != 200:
+            try:
+                resp = httpx.get(url, headers={"User-Agent": "ai-digest-bot/1.0"}, timeout=20)
+                if resp.status_code == 403:
+                    logger.warning(
+                        f"Reddit blocked request for r/{sub} (403). Consider using OAuth authentication."
+                    )
+                    continue
+                if resp.status_code != 200:
+                    logger.warning(f"Failed to fetch r/{sub}: status {resp.status_code}")
+                    continue
+            except Exception as e:
+                logger.warning(f"Error fetching r/{sub}: {e}")
                 continue
             data = resp.json()
             for child in data.get("data", {}).get("children", []):
