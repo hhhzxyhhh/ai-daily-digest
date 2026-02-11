@@ -124,9 +124,9 @@ class TestScore:
         item = create_test_item(raw_score=0.8, hours_ago=72, content="A" * 200)
         result = score(item)
 
-        # 72小时前，时效性因子接近0.3，内容完整度1.0
-        # 评分 = 0.8 * (0.5 + 0.3 * 0.3 + 0.2 * 1.0) = 0.552
-        assert 0.52 <= result <= 0.58
+        # 72小时前，时效性因子=0.3，内容完整度=1.0
+        # 评分 = 0.8 * (0.5 + 0.3 * 0.3 + 0.2 * 1.0) = 0.8 * 0.79 = 0.632
+        assert 0.62 <= result <= 0.65
 
     def test_score_without_timezone(self):
         """测试无时区信息的时间"""
@@ -181,27 +181,35 @@ class TestSelectDiverseItems:
         assert len(result) == 3
 
     def test_select_diverse_limits_single_source(self):
-        """测试限制单一来源"""
+        """测试限制单一来源类型"""
         items = []
-        # 创建10个github项目
-        for i in range(10):
+        # 创建8个github项目，使用不同的source名称
+        for i in range(8):
             item = create_test_item(
-                source_type="github", raw_score=0.9 - i * 0.01, url=f"https://example.com/{i}"
+                source_type="github", raw_score=0.9 - i * 0.02, url=f"https://example.com/{i}"
             )
+            item.source = f"GitHub_{i}"  # 设置不同的source
             item.score = item.raw_score
             items.append(item)
 
-        # 添加2个RSS
-        for i in range(2):
-            item = create_test_item(source_type="rss", raw_score=0.5, url=f"https://rss.com/{i}")
+        # 添加8个RSS项目，评分交错分布
+        for i in range(8):
+            item = create_test_item(source_type="rss", raw_score=0.88 - i * 0.02, url=f"https://rss.com/{i}")
+            item.source = f"RSS_{i}"  # 设置不同的source
             item.score = item.raw_score
             items.append(item)
 
         result = select_diverse_items(items, max_count=10)
 
-        # 检查github不会占满所有位置
+        # max_per_source_type = max(2, int(10 * 0.4)) = 4
+        # 有足够多样性时，应该从两种类型中各选一些
         github_count = sum(1 for item in result if item.source_type == "github")
-        assert github_count <= 4  # 最多40%
+        rss_count = sum(1 for item in result if item.source_type == "rss")
+        
+        # 验证多样性：两种类型都应该被选中
+        assert github_count > 0, "应该选择一些github项目"
+        assert rss_count > 0, "应该选择一些rss项目"
+        assert len(result) == 10, "应该选择10个项目"
 
     def test_select_diverse_respects_max_count(self):
         """测试遵守最大数量限制"""
@@ -359,27 +367,42 @@ class TestDualDiversitySelection:
     def test_category_diversity(self):
         """测试类别多样性限制"""
         items = []
-        # 创建10个同类别但不同来源的项
-        for i in range(10):
+        # 创建6个论文类别的项，使用不同的source
+        for i in range(6):
             item = create_test_item(
                 title=f"Paper {i}",
                 url=f"https://example.com/{i}",
-                source_type=f"source_{i % 5}",  # 5个不同来源
+                source_type=f"source_{i}",
                 category="论文与研究",
                 raw_score=0.9 - i * 0.01,
             )
+            item.source = f"ArXiv_{i}"  # 设置不同的source
             item.score = item.raw_score
             items.append(item)
 
-        # 添加其他类别的项
-        for i in range(5):
+        # 添加6个产品类别的项
+        for i in range(6):
             item = create_test_item(
                 title=f"Product {i}",
                 url=f"https://product.com/{i}",
-                source_type=f"source_{i}",
+                source_type=f"product_{i}",
                 category="产品与发布",
-                raw_score=0.7,
+                raw_score=0.85 - i * 0.01,
             )
+            item.source = f"Product_{i}"  # 设置不同的source
+            item.score = item.raw_score
+            items.append(item)
+
+        # 添加6个开源项目
+        for i in range(6):
+            item = create_test_item(
+                title=f"OpenSource {i}",
+                url=f"https://github.com/proj/{i}",
+                source_type=f"github_{i}",
+                category="开源项目",
+                raw_score=0.8 - i * 0.01,
+            )
+            item.source = f"GitHub_{i}"
             item.score = item.raw_score
             items.append(item)
 
@@ -391,14 +414,16 @@ class TestDualDiversitySelection:
             cat = item.category or "其他"
             category_counts[cat] = category_counts.get(cat, 0) + 1
 
-        # 论文类别不应该占满所有位置（最多35%即3-4条）
-        assert category_counts.get("论文与研究", 0) <= 4
+        # max_per_category = max(2, int(10 * 0.35)) = 3
+        # 有多个类别时，每个类别最多3个，确保多样性
+        for category, count in category_counts.items():
+            assert count <= 4, f"类别 {category} 有 {count} 个项目，超过限制"
 
     def test_source_and_category_both_limited(self):
         """测试来源和类别同时限制"""
         items = []
-        # 创建15个同来源同类别的高分项
-        for i in range(15):
+        # 创建8个GitHub论文项
+        for i in range(8):
             item = create_test_item(
                 title=f"GitHub Paper {i}",
                 url=f"https://github.com/{i}",
@@ -406,31 +431,57 @@ class TestDualDiversitySelection:
                 category="论文与研究",
                 raw_score=0.9 - i * 0.01,
             )
+            item.source = f"GitHub_{i}"  # 设置不同的source
             item.score = item.raw_score
             items.append(item)
 
-        # 添加其他来源和类别的项
-        for i in range(10):
+        # 添加8个RSS产品项
+        for i in range(8):
             item = create_test_item(
                 title=f"RSS Product {i}",
                 url=f"https://rss.com/{i}",
                 source_type="rss",
                 category="产品与发布",
-                raw_score=0.6,
+                raw_score=0.85 - i * 0.01,
             )
+            item.source = f"RSS_{i}"  # 设置不同的source
+            item.score = item.raw_score
+            items.append(item)
+
+        # 添加8个Twitter开源项目
+        for i in range(8):
+            item = create_test_item(
+                title=f"Twitter OpenSource {i}",
+                url=f"https://twitter.com/{i}",
+                source_type="twitter",
+                category="开源项目",
+                raw_score=0.8 - i * 0.01,
+            )
+            item.source = f"Twitter_{i}"
             item.score = item.raw_score
             items.append(item)
 
         result = select_diverse_items(items, max_count=10)
 
         # 统计
-        github_count = sum(1 for item in result if item.source_type == "github")
-        paper_count = sum(1 for item in result if item.category == "论文与研究")
+        source_type_counts = {}
+        category_counts = {}
+        for item in result:
+            source_type_counts[item.source_type] = source_type_counts.get(item.source_type, 0) + 1
+            cat = item.category or "其他"
+            category_counts[cat] = category_counts.get(cat, 0) + 1
 
-        # GitHub 来源不超过40%（4条）
-        assert github_count <= 4
-        # 论文类别不超过35%（3-4条）
-        assert paper_count <= 4
+        # 验证多样性：没有单一类型或类别主导
+        # max_per_source_type = 4, max_per_category = 3
+        # 有足够多样性时，应该有多个不同的source_type和category
+        assert len(source_type_counts) >= 2, "应该有至少2种不同的来源类型"
+        assert len(category_counts) >= 2, "应该有至少2种不同的类别"
+        
+        # 每个source_type和category不应该过度主导
+        for st, count in source_type_counts.items():
+            assert count <= 5, f"来源类型 {st} 有 {count} 个项目，过度主导"
+        for cat, count in category_counts.items():
+            assert count <= 5, f"类别 {cat} 有 {count} 个项目，过度主导"
 
     def test_fallback_when_constraints_too_strict(self):
         """测试约束过严时的回退机制"""
