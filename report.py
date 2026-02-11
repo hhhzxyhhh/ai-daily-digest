@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 
 from jinja2 import Template
 
@@ -111,12 +111,12 @@ HTML_TEMPLATE_FRESH = Template(
                  <span style="font-size: 18px; margin-right: 8px;">🤍</span>
                  <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: {{ top5_title_color }};">Today's Highlights</h2>
             </div>
-            
+
             {% for item in top_items %}
             <div style="background-color: #ffffff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border: 1px solid #eef2f6; position: relative; overflow: hidden;">
                 <!-- Decorative Number -->
                 <div style="position: absolute; top: -10px; right: -5px; font-size: 80px; font-weight: 900; color: {{ top5_number_color }}; z-index: 0; pointer-events: none; opacity: 0.5;">{{ loop.index }}</div>
-                
+
                 <div style="position: relative; z-index: 1;">
                     <div style="margin-bottom: 8px;">
                          <span style="background-color: {{ source_colors_light.get(item.source_type, source_colors_light['Other']) }}; color: {{ source_colors.get(item.source, source_colors['Other']) }}; padding: 4px 10px; border-radius: 100px; font-weight: 600; font-size: 11px; letter-spacing: 0.5px;">{{ item.source }}</span>
@@ -179,22 +179,20 @@ REPORT_HTML_TEMPLATE = HTML_TEMPLATE_FRESH
 
 
 def build_report(items: list[NewsItem], overview: str, total_collected: int) -> tuple[str, str]:
-    from datetime import date as date_class
-    
-    date = datetime.now().strftime("%Y-%m-%d")
+    report_date = datetime.now().strftime("%Y-%m-%d")
     top_items = items[:5]
     rest_items = items[5:]
     grouped: dict[str, list[NewsItem]] = defaultdict(list)
     for item in rest_items:
         grouped[item.category or "Other"].append(item)
-    
+
     # 计算 Top 5 配色主题（每天轮换）
-    theme_index = date_class.today().toordinal() % 7
+    theme_index = date.today().toordinal() % 7
     today_theme = TOP5_COLOR_THEMES[theme_index]
-    
+
     # 4. Pass category_icons and source_colors to context
     context = {
-        "date": date,
+        "date": report_date,
         "overview": overview,
         "top_items": top_items,
         "grouped": grouped,
@@ -207,7 +205,7 @@ def build_report(items: list[NewsItem], overview: str, total_collected: int) -> 
         "top5_title_color": today_theme["title"],
         "top5_number_color": today_theme["number"],
     }
-    
+
     text = REPORT_TEXT_TEMPLATE.render(**context).strip()
     html = REPORT_HTML_TEMPLATE.render(**context).strip()
     return text, html

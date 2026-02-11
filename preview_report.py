@@ -1,15 +1,15 @@
 import os
-from datetime import datetime
-from jinja2 import Template
+from collections import defaultdict
+from datetime import date, datetime
+
 from models import NewsItem
 from report import (
-    REPORT_HTML_TEMPLATE,
     CATEGORY_ICONS,
+    REPORT_HTML_TEMPLATE,
     SOURCE_COLORS,
     SOURCE_COLORS_LIGHT,
     TOP5_COLOR_THEMES,
 )
-from collections import defaultdict
 
 # 1. 创建模拟数据
 mock_items = [
@@ -92,7 +92,7 @@ mock_items = [
         raw_score=0.75,
         score=0.80,
     ),
-     NewsItem(
+    NewsItem(
         title="如何构建高效的 RAG 系统：从入门到进阶",
         url="https://medium.com/ai-tutorial",
         source="Medium",
@@ -113,8 +113,6 @@ rest_items = mock_items[5:]
 grouped = defaultdict(list)
 for item in rest_items:
     grouped[item.category or "其他"].append(item)
-
-from datetime import date
 
 # 计算 Top 5 配色主题（与 report.py 中的逻辑一致）
 theme_index = date.today().toordinal() % 7
