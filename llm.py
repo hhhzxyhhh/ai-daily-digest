@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import itertools
-import os
 from dataclasses import dataclass
 
 import yaml
@@ -25,7 +24,7 @@ class LLMRouter:
         self._rr_cycle = itertools.cycle(self.providers)
 
     def _load_providers(self, providers_path: str) -> list[ProviderConfig]:
-        with open(providers_path, "r", encoding="utf-8") as f:
+        with open(providers_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         providers = data.get("providers", {})
 
@@ -38,11 +37,13 @@ class LLMRouter:
             api_key_attr = cfg["env_key"].lower()
             model_attr = cfg["env_model"].lower()
             base_url_attr = cfg["env_base_url"].lower()
-            
+
             api_key = getattr(self.settings, api_key_attr, None)
             model = getattr(self.settings, model_attr, None) or cfg.get("default_model", "")
-            base_url = getattr(self.settings, base_url_attr, None) or cfg.get("default_base_url", "")
-            
+            base_url = getattr(self.settings, base_url_attr, None) or cfg.get(
+                "default_base_url", ""
+            )
+
             if not api_key:
                 return None
             return ProviderConfig(

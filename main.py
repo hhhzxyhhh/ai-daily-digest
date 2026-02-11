@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -11,8 +12,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from collectors import (
     GitHubCollector,
     NewsAPICollector,
-    RSSCollector,
     RedditCollector,
+    RSSCollector,
     TwitterCollector,
     WebScraperCollector,
 )
@@ -21,7 +22,6 @@ from delivery import send_email
 from llm import LLMRouter
 from models import NewsItem
 from processing import (
-    classify,
     classify_with_llm,
     deduplicate,
     deduplicate_fuzzy,
@@ -31,8 +31,6 @@ from processing import (
     select_diverse_items,
 )
 from report import build_report
-from collections import Counter
-
 
 SUMMARY_PROMPT = """
 你是一位专业的 AI 领域新闻编辑。请对以下新闻进行摘要：
@@ -86,28 +84,32 @@ def run_once() -> None:
     items = deduplicate(items)
     items = deduplicate_fuzzy(items, threshold=0.75)
     logging.info(f"Total items after dedup: {len(items)}")
-    
+
     # 统计各数据源贡献
     source_stats = Counter(item.source_type for item in items)
     logging.info(f"Source distribution: {dict(source_stats)}")
-    
+
     # ========== 三层过滤机制 ==========
     # 第一层：关键词预过滤（黑名单+白名单）
     whitelist_items, greyzone_items, blacklist_items = filter_relevance_keyword(items)
-    logging.info(f"Filter Layer 1 - Keyword: whitelist={len(whitelist_items)}, greyzone={len(greyzone_items)}, blacklist={len(blacklist_items)}")
-    
+    logging.info(
+        f"Filter Layer 1 - Keyword: whitelist={len(whitelist_items)}, greyzone={len(greyzone_items)}, blacklist={len(blacklist_items)}"
+    )
+
     # 第二层：LLM精准判断（仅对灰色地带）
     llm_approved_items = filter_ai_relevance_llm(greyzone_items, router)
-    logging.info(f"Filter Layer 2 - LLM relevance: {len(llm_approved_items)} approved out of {len(greyzone_items)} greyzone items")
-    
+    logging.info(
+        f"Filter Layer 2 - LLM relevance: {len(llm_approved_items)} approved out of {len(greyzone_items)} greyzone items"
+    )
+
     # 合并通过的新闻
     items = whitelist_items + llm_approved_items
     logging.info(f"Total items after relevance filtering: {len(items)}")
-    
+
     # 第三层：LLM智能分类
     classify_with_llm(items, router)
-    logging.info(f"Filter Layer 3 - LLM classification completed")
-    
+    logging.info("Filter Layer 3 - LLM classification completed")
+
     # 评分
     for item in items:
         item.score = score(item)
@@ -115,7 +117,7 @@ def run_once() -> None:
     items.sort(key=lambda x: x.score, reverse=True)
     # 使用多样性选择器,确保来源均衡
     items = select_diverse_items(items, max_count=10)
-    
+
     # 统计最终选择的来源分布
     final_stats = Counter(item.source_type for item in items)
     logging.info(f"Final selection source distribution: {dict(final_stats)}")

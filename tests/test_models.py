@@ -1,6 +1,7 @@
 """测试数据模型"""
-import pytest
+
 from datetime import datetime, timezone
+
 from models import NewsItem
 
 
@@ -12,9 +13,9 @@ def test_newsitem_creation():
         source="Test Source",
         source_type="rss",
         content="Test content",
-        published_at=datetime.now(timezone.utc)
+        published_at=datetime.now(timezone.utc),
     )
-    
+
     assert item.title == "Test News"
     assert item.url == "https://example.com/news"
     assert item.source_type == "rss"
@@ -35,9 +36,9 @@ def test_newsitem_with_optional_fields():
         author="John Doe",
         tags=["ai", "ml"],
         raw_score=0.8,
-        category="论文与研究"
+        category="论文与研究",
     )
-    
+
     assert item.author == "John Doe"
     assert len(item.tags) == 2
     assert "ai" in item.tags
@@ -54,7 +55,7 @@ def test_newsitem_fingerprint():
         source_type="rss",
         content="Content",
         published_at=datetime.now(timezone.utc),
-        fingerprint="abc123"
+        fingerprint="abc123",
     )
-    
+
     assert item.fingerprint == "abc123"

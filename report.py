@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
-from typing import Iterable
 
 from jinja2 import Template
 
 from models import NewsItem
-
 
 REPORT_TEXT_TEMPLATE = Template(
     """

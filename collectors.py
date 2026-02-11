@@ -38,7 +38,7 @@ class RSSCollector(BaseCollector):
 
     def collect(self) -> list[NewsItem]:
         try:
-            with open(self.sources_path, "r", encoding="utf-8") as f:
+            with open(self.sources_path, encoding="utf-8") as f:
                 sources = yaml.safe_load(f).get("rss", [])
         except Exception as e:
             logger.error(f"Failed to load RSS sources: {e}")
@@ -56,13 +56,31 @@ class RSSCollector(BaseCollector):
 
         # AI关键词列表（用于Hacker News过滤）
         ai_keywords = [
-            "ai", "artificial intelligence", "machine learning", "deep learning",
-            "llm", "gpt", "neural network", "transformer", "diffusion", "agent",
-            "openai", "anthropic", "chatgpt", "claude", "gemini",
-            "pytorch", "tensorflow", "hugging face", "langchain",
-            "computer vision", "nlp", "natural language", "reinforcement learning",
+            "ai",
+            "artificial intelligence",
+            "machine learning",
+            "deep learning",
+            "llm",
+            "gpt",
+            "neural network",
+            "transformer",
+            "diffusion",
+            "agent",
+            "openai",
+            "anthropic",
+            "chatgpt",
+            "claude",
+            "gemini",
+            "pytorch",
+            "tensorflow",
+            "hugging face",
+            "langchain",
+            "computer vision",
+            "nlp",
+            "natural language",
+            "reinforcement learning",
         ]
-        
+
         items: list[NewsItem] = []
         for src in sources:
             try:
@@ -74,16 +92,16 @@ class RSSCollector(BaseCollector):
                         )
                         content = entry.get("summary", "") or entry.get("description", "")
                         title = entry.get("title", "").strip()
-                        
+
                         # 对Hacker News进行关键词过滤
                         if src["name"] == "Hacker News":
                             combined_text = f"{title} {content}".lower()
                             if not any(keyword in combined_text for keyword in ai_keywords):
                                 continue  # 跳过不包含AI关键词的新闻
-                        
+
                         # 根据来源权威度设置 raw_score
                         raw_score = source_authority.get(src["name"], 0.5)
-                        
+
                         item = NewsItem(
                             title=title,
                             url=entry.get("link", "").strip(),
@@ -127,7 +145,7 @@ class GitHubCollector(BaseCollector):
 
     def collect(self) -> list[NewsItem]:
         try:
-            with open(self.sources_path, "r", encoding="utf-8") as f:
+            with open(self.sources_path, encoding="utf-8") as f:
                 cfg = yaml.safe_load(f).get("github", {})
         except Exception as e:
             logger.error(f"Failed to load GitHub config: {e}")
@@ -169,7 +187,8 @@ class GitHubCollector(BaseCollector):
                         stars_text = stars_today_elem.get_text(strip=True)
                         # 提取数字，如 "123 stars today"
                         import re
-                        match = re.search(r'(\d+)', stars_text)
+
+                        match = re.search(r"(\d+)", stars_text)
                         if match:
                             stars_today = int(match.group(1))
                             raw_score = min(0.9, 0.5 + 0.1 * math.log1p(stars_today / 10))
@@ -210,7 +229,7 @@ class GitHubCollector(BaseCollector):
             # 利用 stars 数动态计算 raw_score
             stars = repo.get("stargazers_count", 0)
             raw_score = min(0.9, 0.3 + 0.2 * math.log1p(stars / 100))
-            
+
             item = NewsItem(
                 title=f"New AI Repo: {repo['full_name']}",
                 url=repo["html_url"],
@@ -262,7 +281,7 @@ class NewsAPICollector(BaseCollector):
     def collect(self) -> list[NewsItem]:
         if not self.newsapi_key:
             return []
-        with open(self.sources_path, "r", encoding="utf-8") as f:
+        with open(self.sources_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f).get("newsapi", {})
         query = cfg.get("query", "AI OR LLM OR machine learning OR deep learning")
         page_size = int(cfg.get("page_size", 20))
@@ -283,7 +302,9 @@ class NewsAPICollector(BaseCollector):
                 source=article.get("source", {}).get("name", "NewsAPI"),
                 source_type=self.source_type,
                 content=article.get("description") or article.get("content") or "",
-                published_at=date_parser.parse(article.get("publishedAt") or datetime.now(timezone.utc).isoformat()),
+                published_at=date_parser.parse(
+                    article.get("publishedAt") or datetime.now(timezone.utc).isoformat()
+                ),
                 author=article.get("author"),
                 raw_score=0.5,
             )
@@ -302,15 +323,15 @@ class WebScraperCollector(BaseCollector):
         }
 
     def collect(self) -> list[NewsItem]:
-        with open(self.sources_path, "r", encoding="utf-8") as f:
+        with open(self.sources_path, encoding="utf-8") as f:
             sites = yaml.safe_load(f).get("websites", [])
 
         items: list[NewsItem] = []
         for site in sites:
             items.extend(self._collect_from_html(site))
-        
+
         return items
-    
+
     def _extract_publish_time(self, url: str, soup: BeautifulSoup | None) -> datetime:
         """提取文章发布时间"""
         # 方法1：从详情页的 <time> 标签提取
@@ -324,9 +345,9 @@ class WebScraperCollector(BaseCollector):
                         return date_parser.parse(dt_str)
                     except Exception:
                         pass
-        
+
         # 方法2：从 URL 中提取日期（如 /2026/02/378423.html）
-        date_pattern = r'/(\d{4})/(\d{2})/(\d{2})'
+        date_pattern = r"/(\d{4})/(\d{2})/(\d{2})"
         match = re.search(date_pattern, url)
         if match:
             try:
@@ -334,36 +355,36 @@ class WebScraperCollector(BaseCollector):
                 return datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
             except Exception:
                 pass
-        
+
         # 回退：使用当前时间
         return datetime.now(timezone.utc)
-    
+
     def _collect_from_html(self, site: dict) -> list[NewsItem]:
         """从 HTML 页面爬取文章列表"""
         url = site.get("url")
         selector = site.get("selector")
         site_name = site.get("name", "Unknown")
-        
+
         if not url or not selector:
             logger.warning(f"Site {site_name} missing url or selector")
             return []
-        
+
         items: list[NewsItem] = []
         try:
             resp = httpx.get(url, headers=self.headers, timeout=20)
             if resp.status_code != 200:
                 logger.warning(f"Failed to fetch {site_name} ({url}): status {resp.status_code}")
                 return []
-            
+
             soup = BeautifulSoup(resp.text, "html.parser")
             links = soup.select(selector)
-            
+
             if not links:
                 logger.warning(f"No links found for {site_name} with selector '{selector}'")
                 return []
-            
+
             logger.info(f"Found {len(links)} links for {site_name}")
-            
+
             for link in links[:20]:
                 href = link.get("href") or ""
                 title = link.get_text(strip=True)
@@ -371,21 +392,29 @@ class WebScraperCollector(BaseCollector):
                     href = site.get("base_url", url).rstrip("/") + href
                 if not href or not title:
                     continue
-                
+
                 # 尝试二次抓取正文内容
                 content = ""
                 try:
                     detail_resp = httpx.get(href, headers=self.headers, timeout=10)
                     if detail_resp.status_code == 200:
                         detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
-                        
+
                         # 提取段落并过滤样板文本
                         paragraphs = detail_soup.select("p")
                         filtered_paragraphs = []
-                        
+
                         # 样板关键词（用于过滤）
-                        boilerplate_keywords = ["扫码", "关注", "二维码", "订阅", "点击", "转发", "分享"]
-                        
+                        boilerplate_keywords = [
+                            "扫码",
+                            "关注",
+                            "二维码",
+                            "订阅",
+                            "点击",
+                            "转发",
+                            "分享",
+                        ]
+
                         for p in paragraphs:
                             text = p.get_text(strip=True)
                             # 过滤：长度太短（<20字符）或包含样板关键词
@@ -397,7 +426,7 @@ class WebScraperCollector(BaseCollector):
                             # 最多取5段
                             if len(filtered_paragraphs) >= 5:
                                 break
-                        
+
                         content = " ".join(filtered_paragraphs)
                         # 限制长度
                         if len(content) > 500:
@@ -405,10 +434,12 @@ class WebScraperCollector(BaseCollector):
                 except Exception as e:
                     logger.debug(f"Failed to fetch content from {href}: {e}")
                     content = ""
-                
+
                 # 提取发布时间
-                published_at = self._extract_publish_time(href, detail_soup if 'detail_soup' in locals() else None)
-                
+                published_at = self._extract_publish_time(
+                    href, detail_soup if "detail_soup" in locals() else None
+                )
+
                 item = NewsItem(
                     title=title,
                     url=href,
@@ -422,7 +453,7 @@ class WebScraperCollector(BaseCollector):
                 items.append(item)
         except Exception as e:
             logger.error(f"Failed to collect from {site_name}: {e}")
-        
+
         return items
 
 
@@ -433,7 +464,7 @@ class RedditCollector(BaseCollector):
         self.sources_path = sources_path
 
     def collect(self) -> list[NewsItem]:
-        with open(self.sources_path, "r", encoding="utf-8") as f:
+        with open(self.sources_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f).get("reddit", {})
         subs = cfg.get("subreddits", ["MachineLearning", "artificial", "LocalLLaMA"])
         limit = int(cfg.get("limit", 20))
@@ -447,20 +478,24 @@ class RedditCollector(BaseCollector):
             data = resp.json()
             for child in data.get("data", {}).get("children", []):
                 post = child.get("data", {})
-                
+
                 # 利用社交信号动态计算 raw_score
                 upvotes = post.get("score", 0)
                 comments = post.get("num_comments", 0)
                 # 对数归一化到 0.3-0.9 范围
-                raw_score = min(0.9, 0.3 + 0.15 * math.log1p(upvotes / 50) + 0.1 * math.log1p(comments / 10))
-                
+                raw_score = min(
+                    0.9, 0.3 + 0.15 * math.log1p(upvotes / 50) + 0.1 * math.log1p(comments / 10)
+                )
+
                 item = NewsItem(
                     title=post.get("title") or "",
                     url=f"https://www.reddit.com{post.get('permalink', '')}",
                     source=f"r/{sub}",
                     source_type=self.source_type,
                     content=post.get("selftext") or "",
-                    published_at=datetime.fromtimestamp(post.get("created_utc", 0), tz=timezone.utc),
+                    published_at=datetime.fromtimestamp(
+                        post.get("created_utc", 0), tz=timezone.utc
+                    ),
                     author=post.get("author"),
                     raw_score=raw_score,
                 )
@@ -479,7 +514,7 @@ class TwitterCollector(BaseCollector):
     def collect(self) -> list[NewsItem]:
         if not self.bearer_token:
             return []
-        with open(self.sources_path, "r", encoding="utf-8") as f:
+        with open(self.sources_path, encoding="utf-8") as f:
             cfg = yaml.safe_load(f).get("twitter", {})
         query = cfg.get("query", "AI OR LLM OR machine learning lang:en")
         max_results = int(cfg.get("max_results", 20))

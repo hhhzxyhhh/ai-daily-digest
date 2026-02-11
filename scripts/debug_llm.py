@@ -1,13 +1,14 @@
-import sys
 import os
+import sys
 from pathlib import Path
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from config import load_settings
-from llm import LLMRouter
+# noqa: E402 - imports after path modification
+from config import load_settings  # noqa: E402
+from llm import LLMRouter  # noqa: E402
 
 settings = load_settings()
 print("=== Debug Load Providers ===")
@@ -27,4 +28,4 @@ print("\n--- Trying to load providers manually ---")
 router = LLMRouter(settings, "llm_providers.yaml")
 print(f"Success! Loaded {len(router.providers)} providers")
 for i, provider in enumerate(router.providers):
-    print(f"Provider {i+1}: {provider.name} - {provider.model}")
+    print(f"Provider {i + 1}: {provider.name} - {provider.model}")

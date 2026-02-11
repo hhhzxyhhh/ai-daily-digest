@@ -1,6 +1,6 @@
 """测试配置加载"""
-import pytest
-from config import Settings, load_settings
+
+from config import Settings
 
 
 def test_settings_defaults():
@@ -8,9 +8,9 @@ def test_settings_defaults():
     settings = Settings(
         email_sender="test@example.com",
         email_password="test123",
-        email_recipients="user@example.com"
+        email_recipients="user@example.com",
     )
-    
+
     assert settings.llm_strategy == "fallback"
     assert settings.llm_primary_provider == "qwen"
     assert settings.llm_secondary_provider == "zhipu"
@@ -27,9 +27,9 @@ def test_settings_custom_values():
         schedule_hour=8,
         email_sender="test@example.com",
         email_password="test123",
-        email_recipients="user@example.com"
+        email_recipients="user@example.com",
     )
-    
+
     assert settings.llm_strategy == "primary"
     assert settings.llm_primary_provider == "zhipu"
     assert settings.schedule_hour == 8
@@ -42,9 +42,9 @@ def test_email_settings():
         email_smtp_port=465,
         email_sender="sender@test.com",
         email_password="pass123",
-        email_recipients="user1@test.com,user2@test.com"
+        email_recipients="user1@test.com,user2@test.com",
     )
-    
+
     assert settings.email_smtp_host == "smtp.test.com"
     assert settings.email_smtp_port == 465
     assert settings.email_sender == "sender@test.com"
