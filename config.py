@@ -21,6 +21,36 @@ class Settings(BaseSettings):
     zhipu_model: str = "glm-4-flash"
     zhipu_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
 
+    # DeepSeek
+    deepseek_api_key: str | None = None
+    deepseek_model: str = "deepseek-chat"
+    deepseek_base_url: str = "https://api.deepseek.com/v1"
+
+    # Moonshot (Kimi)
+    moonshot_api_key: str | None = None
+    moonshot_model: str = "moonshot-v1-8k"
+    moonshot_base_url: str = "https://api.moonshot.cn/v1"
+
+    # Doubao (字节跳动)
+    doubao_api_key: str | None = None
+    doubao_model: str = "doubao-pro-4k"
+    doubao_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
+
+    # OpenAI
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
+
+    # Claude (Anthropic)
+    claude_api_key: str | None = None
+    claude_model: str = "claude-3-5-haiku-20241022"
+    claude_base_url: str = "https://api.anthropic.com/v1"
+
+    # Gemini (Google)
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.0-flash-exp"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+
     # Email
     email_smtp_host: str = "smtp.gmail.com"
     email_smtp_port: int = 587

@@ -12,7 +12,7 @@
 ## ✨ 核心特性
 
 - 🔍 **多源采集**: 自动从 RSS、GitHub、NewsAPI、Reddit、Twitter、网页爬虫等多个渠道采集 AI 资讯
-- 🤖 **智能摘要**: 使用通义千问/智谱 GLM 等国产大模型自动生成中文摘要
+- 🤖 **智能摘要**: 支持 **DeepSeek、Moonshot (Kimi)、Claude、OpenAI (GPT-4)、Gemini、豆包、通义千问、智谱 GLM** 等 8 种主流大模型
 - 📊 **智能分类**: 自动将新闻分为论文研究、产品发布、行业动态、教程观点、开源项目等类别
 - 🎯 **重要性评分**: 综合考量来源权威度、社交热度、时效性等因素智能排序
 - 📧 **邮件推送**: 每日定时生成精美的 HTML 邮件报告并自动发送
@@ -72,7 +72,22 @@
 
 #### 1. LLM API 配置
 
-项目支持通义千问和智谱 GLM,**至少需要配置其中一个**:
+#### 1. LLM API 配置
+
+项目内置支持 **DeepSeek、OpenAI、Claude、Gemini、Moonshot (Kimi)、豆包、通义千问、智谱 GLM** 等多种模型。
+
+详细配置方法请参考 **[LLM 配置指南](docs/llm_guide.md)**。
+
+**快速配置示例 (DeepSeek):**
+1. 获取 API Key: https://platform.deepseek.com/api_keys
+2. 编辑 `.env`:
+   ```env
+   LLM_PRIMARY_PROVIDER=deepseek
+   DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   DEEPSEEK_MODEL=deepseek-chat
+   ```
+
+**更多模型配置示例:**
 
 **通义千问 (推荐)**
 - 获取地址: https://dashscope.console.aliyun.com/apiKey

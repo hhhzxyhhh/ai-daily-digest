@@ -15,11 +15,50 @@ providers:
     default_model: "glm-4-flash"
     default_base_url: "https://open.bigmodel.cn/api/paas/v4"
 
-  # 预留扩展
-  # deepseek:
-  #   name: "DeepSeek"
-  #   env_key: "DEEPSEEK_API_KEY"
-  #   env_model: "DEEPSEEK_MODEL"
-  #   env_base_url: "DEEPSEEK_BASE_URL"
-  #   default_model: "deepseek-chat"
-  #   default_base_url: "https://api.deepseek.com/v1"
+  deepseek:
+    name: "DeepSeek"
+    env_key: "DEEPSEEK_API_KEY"
+    env_model: "DEEPSEEK_MODEL"
+    env_base_url: "DEEPSEEK_BASE_URL"
+    default_model: "deepseek-chat"
+    default_base_url: "https://api.deepseek.com/v1"
+
+  moonshot:
+    name: "Moonshot (Kimi)"
+    env_key: "MOONSHOT_API_KEY"
+    env_model: "MOONSHOT_MODEL"
+    env_base_url: "MOONSHOT_BASE_URL"
+    default_model: "moonshot-v1-8k"
+    default_base_url: "https://api.moonshot.cn/v1"
+
+  doubao:
+    name: "豆包 (字节跳动)"
+    env_key: "DOUBAO_API_KEY"
+    env_model: "DOUBAO_MODEL"
+    env_base_url: "DOUBAO_BASE_URL"
+    default_model: "doubao-pro-4k"
+    default_base_url: "https://ark.cn-beijing.volces.com/api/v3"
+
+  openai:
+    name: "OpenAI"
+    env_key: "OPENAI_API_KEY"
+    env_model: "OPENAI_MODEL"
+    env_base_url: "OPENAI_BASE_URL"
+    default_model: "gpt-4o-mini"
+    default_base_url: "https://api.openai.com/v1"
+
+  claude:
+    name: "Claude (Anthropic)"
+    env_key: "CLAUDE_API_KEY"
+    env_model: "CLAUDE_MODEL"
+    env_base_url: "CLAUDE_BASE_URL"
+    default_model: "claude-3-5-haiku-20241022"
+    default_base_url: "https://api.anthropic.com/v1"
+
+  gemini:
+    name: "Gemini (Google)"
+    env_key: "GEMINI_API_KEY"
+    env_model: "GEMINI_MODEL"
+    env_base_url: "GEMINI_BASE_URL"
+    default_model: "gemini-2.0-flash-exp"
+    default_base_url: "https://generativelanguage.googleapis.com/v1beta"
