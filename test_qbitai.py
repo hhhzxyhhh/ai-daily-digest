@@ -1,6 +1,6 @@
+import logging
 import os
 import sys
-import logging
 
 # 设置日志级别
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,29 +22,29 @@ except ImportError as e:
 
 def test_qbitai_scraping():
     sources_path = os.path.join(current_dir, "sources.yaml")
-    
+
     if not os.path.exists(sources_path):
         print(f"错误: 配置文件未找到: {sources_path}")
         return
 
     print(f"正在初始化采集器，配置文件: {sources_path}")
     collector = WebScraperCollector(sources_path)
-    
+
     print("开始从量子位 (QbitAI) 抓取内容...")
     try:
         # 执行抓取
         items = collector.collect()
-        
+
         # 过滤量子位的内容（以防 sources.yaml 中有其他网站）
         qbit_items = [i for i in items if "量子位" in i.source or "qbitai" in i.url]
-        
+
         if not qbit_items:
             print("未抓取到量子位的内容。请检查网络连接或选择器配置。")
             return
 
         print(f"\n成功抓取 {len(qbit_items)} 条内容：")
         print("=" * 60)
-        
+
         # 简单去重 (以防 .swiper-slide a 和 h4 a 抓取了相同的内容)
         seen_titles = set()
         unique_items = []
@@ -52,7 +52,7 @@ def test_qbitai_scraping():
             if item.title not in seen_titles:
                 unique_items.append(item)
                 seen_titles.add(item.title)
-        
+
         for i, item in enumerate(unique_items, 1):
             print(f"[{i}] 标题: {item.title}")
             print(f"    链接: {item.url}")
