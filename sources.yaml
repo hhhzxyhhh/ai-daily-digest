@@ -43,7 +43,7 @@ github:
 websites:
   - name: "量子位"
     url: "https://www.qbitai.com/"
-    selector: "h4 a"
+    selector: ".swiper-slide a, h4 a"
     base_url: "https://www.qbitai.com"
 
 reddit:
@@ -51,12 +51,13 @@ reddit:
     - "MachineLearning"
     - "artificial"
     - "LocalLLaMA"
-    - "AItools"
+    - "AIToolsPromptWorkflow"
     - "ArtificialIntelligence"
-    - "AIProduct"
+    - "deeplearning"
     - "computervision"
     - "NLP"
     - "reinforcementlearning"
+    - "AI_Agents"
   limit: 20
 
 twitter:
